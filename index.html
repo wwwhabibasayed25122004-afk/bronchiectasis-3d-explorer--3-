@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bronchiectasis: Pathophysiology Explorer</title>
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #0a0a0c;
+            --accent-color: #4cc9f0;
+            --panel-bg: rgba(20, 20, 25, 0.85);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --text-color: #f8f9fa;
+            --correct-color: #4ade80;
+            --incorrect-color: #f87171;
+            --warning-color: #fbbf24;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Inter', sans-serif;
+            overflow: hidden;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        #canvas-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            background: radial-gradient(circle at center, #1a1a2e 0%, #0a0a0c 100%);
+        }
+
+        /* Glassmorphism UI */
+        .overlay {
+            position: absolute;
+            z-index: 10;
+            pointer-events: none;
+        }
+
+        .glass-panel {
+            background: var(--panel-bg);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            padding: 24px;
+            pointer-events: auto;
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+        }
+
+        #header-panel {
+            top: 30px;
+            left: 30px;
+            max-width: 380px;
+        }
+
+        h1 {
+            font-size: 1.4rem;
+            font-weight: 600;
+            letter-spacing: 2px;
+            margin-bottom: 8px;
+            color: var(--accent-color);
+            text-transform: uppercase;
+        }
+
+        #script-panel {
+            top: 30px;
+            right: 30px;
+            max-width: 320px;
+            text-align: right;
+        }
+
+        #script-text {
+            font-size: 0.9rem;
+            line-height: 1.5;
+            color: var(--text-color);
+            opacity: 0.9;
+        }
+
+        #timeline-container {
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 85%;
+            max-width: 1000px;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        #play-btn {
+            background: var(--accent-color);
+            border: none;
+            color: var(--bg-color);
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            transition: transform 0.2s, background 0.2s;
+        }
+
+        #play-btn:hover { transform: scale(1.1); background: #63d5f7; }
+
+        #scrubber-track {
+            flex-grow: 1;
+            height: 6px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+            position: relative;
+            cursor: pointer;
+        }
+
+        #scrubber-progress {
+            position: absolute;
+            top: 0;
+            left: 0;
+            height: 100%;
+            width: 0%;
+            background: var(--accent-color);
+            border-radius: 3px;
+            box-shadow: 0 0 15px var(--accent-color);
+        }
+
+        /* Intro Screen */
+        #intro-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--bg-color);
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            transition: opacity 0.8s ease, visibility 0.8s;
+        }
+
+        #start-image {
+            width: 100%;
+            max-width: 700px;
+            height: 350px;
+            object-fit: contain;
+            margin-bottom: 30px;
+            border-radius: 12px;
+            background: rgba(255,255,255,0.02);
+            padding: 10px;
+        }
+
+        #start-btn {
+            padding: 20px 60px;
+            font-size: 1.2rem;
+            background: var(--accent-color);
+            border: none;
+            border-radius: 50px;
+            color: var(--bg-color);
+            font-weight: 600;
+            cursor: pointer;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            transition: all 0.3s ease;
+            box-shadow: 0 6px 20px rgba(76, 201, 240, 0.3);
+        }
+
+        #start-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 30px rgba(76, 201, 240, 0.5);
+        }
+
+        #manual-mode-btn {
+            margin-top: 15px;
+            background: transparent;
+            border: 1px solid var(--accent-color);
+            color: var(--accent-color);
+            padding: 10px 20px;
+            border-radius: 30px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            display: none;
+            transition: all 0.2s;
+        }
+
+        #manual-mode-btn:hover {
+            background: rgba(76, 201, 240, 0.1);
+        }
+
+        /* Modals */
+        #modal-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+            backdrop-filter: blur(10px);
+        }
+
+        #question-modal {
+            max-width: 550px;
+            width: 90%;
+            text-align: center;
+        }
+
+        .option-btn {
+            display: block;
+            width: 100%;
+            padding: 18px;
+            margin: 10px 0;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--glass-border);
+            color: white;
+            border-radius: 10px;
+            cursor: pointer;
+            text-align: left;
+            transition: all 0.2s;
+        }
+
+        .option-btn:hover { background: rgba(255, 255, 255, 0.1); transform: translateX(8px); }
+        .option-btn.correct { background: var(--correct-color) !important; color: #000; font-weight: 600; }
+        .option-btn.incorrect { background: var(--incorrect-color) !important; animation: shake 0.4s; }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-8px); }
+            75% { transform: translateX(8px); }
+        }
+
+        /* Errors */
+        #error-display {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(248, 113, 113, 0.2);
+            border: 1px solid var(--incorrect-color);
+            color: var(--incorrect-color);
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            z-index: 3000;
+            display: none;
+            backdrop-filter: blur(4px);
+        }
+
+        .loader {
+            width: 40px; height: 40px;
+            border: 3px solid rgba(255,255,255,0.1);
+            border-top-color: var(--accent-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        #manual-trigger-btn {
+            background: var(--accent-color);
+            border: none;
+            color: var(--bg-color);
+            padding: 8px 16px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 10px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="intro-screen">
+        <img src="./assets/start_lung.png" id="start-image" alt="Lung Anatomy" onerror="this.style.display='none';">
+        <div class="loader" id="intro-loader"></div>
+        <h2 style="margin-bottom: 15px; font-weight: 300; letter-spacing: 4px; text-transform: uppercase;">Bronchiectasis Explorer</h2>
+        <div id="loading-status" style="margin-bottom: 25px; font-size: 0.9rem; opacity: 0.6;">Loading Clinical Data...</div>
+        
+        <button id="start-btn" style="display: none;">Start Lesson</button>
+        <button id="manual-mode-btn">Skip Audio & Start Manual Quiz</button>
+    </div>
+
+    <div id="canvas-container"></div>
+
+    <!-- UI Panels -->
+    <div id="header-panel" class="overlay glass-panel">
+        <h1>Pathophysiology</h1>
+        <p style="font-size: 0.85rem; opacity: 0.7; font-weight: 300;">
+            Visualizing irreversible bronchial dilation and the ciliary escalator failure.
+        </p>
+    </div>
+
+    <div id="script-panel" class="overlay glass-panel">
+        <p id="script-text">Initializing lesson...</p>
+        <button id="manual-trigger-btn">Next Chapter</button>
+    </div>
+
+    <div id="timeline-container" class="overlay glass-panel">
+        <button id="play-btn">⏸</button>
+        <div id="scrubber-track">
+            <div id="scrubber-progress"></div>
+        </div>
+        <span id="time-display" style="font-size: 0.8rem; font-family: monospace; opacity: 0.6;">00:00</span>
+    </div>
+
+    <!-- Modals -->
+    <div id="modal-overlay">
+        <div id="question-modal" class="glass-panel">
+            <h3 style="margin-bottom: 15px; color: var(--accent-color); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px;">Knowledge Check</h3>
+            <p id="modal-question" style="font-size: 1.1rem; margin-bottom: 25px; line-height: 1.4;"></p>
+            <div id="modal-options"></div>
+        </div>
+    </div>
+
+    <div id="error-display"></div>
+
+    <!-- Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+
+    <script>
+        /**
+         * BRONCHIECTASIS PATHOPHYSIOLOGY EXPLORER
+         * Robust Senior Implementation
+         */
+
+        const MODEL_PATH = './models/lung.glb';
+        const AUDIO_PATH = './audio/biology-script.mp3';
+
+        const state = {
+            isPlaying: false,
+            currentTime: 0,
+            duration: 0,
+            isModalOpen: false,
+            manualMode: false,
+            currentMilestone: 0,
+            questionsTriggered: new Set(),
+            breathingTime: 0,
+            assetsLoaded: false,
+            modelLoaded: false
+        };
+
+        const scriptMilestones = [
+            { time: 0, text: "Welcome. Observe the structural integrity of the bronchial tree." },
+            { time: 25, text: "Focus: Irreversible dilation. The airway walls have lost their elastic recoil.", question: 0 },
+            { time: 70, text: "Examining the mucosal layer and ciliary escalator..." },
+            { time: 110, text: "Concept: Mucus stasis. Trapped secretions lead to chronic infection.", question: 1 },
+            { time: 160, text: "The Vicious Cycle: Inflammation drives further structural damage." },
+            { time: 205, text: "Final Assessment: Understanding the long-term clinical impact.", question: 2 }
+        ];
+
+        const questions = [
+            {
+                text: "What is the primary structural change in bronchiectasis?",
+                options: [
+                    { t: "Temporary inflammation of the alveoli", l: "A" },
+                    { t: "Permanent, irreversible widening of the bronchi", l: "B" },
+                    { t: "Excessive production of surfactant", l: "C" }
+                ],
+                correct: "B"
+            },
+            {
+                text: "Why does mucus stasis occur in this pathology?",
+                options: [
+                    { t: "Due to hyper-efficient ciliary movement", l: "A" },
+                    { t: "Failure of the ciliary escalator to clear secretions", l: "B" },
+                    { t: "The lungs become too dry", l: "C" }
+                ],
+                correct: "B"
+            },
+            {
+                text: "What drives 'The Vicious Cycle' of the disease?",
+                options: [
+                    { t: "Infection, inflammation, and progressive airway damage", l: "A" },
+                    { t: "Regular antibiotic use", l: "B" },
+                    { t: "High altitude living", l: "C" }
+                ],
+                correct: "A"
+            }
+        ];
+
+        // --- Core Audio Setup ---
+        const audio = new Audio(AUDIO_PATH);
+        audio.addEventListener('error', () => {
+            console.warn("Audio file missing or failed to load. Enabling Manual Mode option.");
+            document.getElementById('manual-mode-btn').style.display = 'block';
+        });
+
+        // --- Three.js Setup ---
+        let scene, camera, renderer, controls, lungModel;
+        const loader = new THREE.GLTFLoader();
+
+        function initThree() {
+            try {
+                scene = new THREE.Scene();
+                scene.background = new THREE.Color(0x0a0a0c);
+                scene.fog = new THREE.FogExp2(0x0a0a0c, 0.04);
+
+                camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+                camera.position.set(0, 2, 12);
+
+                renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+                renderer.setSize(window.innerWidth, window.innerHeight);
+                renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+                document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+                controls = new THREE.OrbitControls(camera, renderer.domElement);
+                controls.enableDamping = true;
+                controls.dampingFactor = 0.05;
+                controls.target.set(0, 1, 0);
+
+                const ambient = new THREE.AmbientLight(0xffffff, 0.5);
+                scene.add(ambient);
+                const sun = new THREE.DirectionalLight(0xffffff, 1.2);
+                sun.position.set(5, 10, 7.5);
+                scene.add(sun);
+                const rim = new THREE.PointLight(0x4cc9f0, 2, 50);
+                rim.position.set(-10, 5, -10);
+                scene.add(rim);
+
+                loadModel();
+                animate();
+            } catch (err) {
+                showError("3D Engine Error: Failed to initialize Three.js.");
+                console.error(err);
+            }
+        }
+
+        function loadModel() {
+            loader.load(MODEL_PATH, (gltf) => {
+                lungModel = gltf.scene;
+                const box = new THREE.Box3().setFromObject(lungModel);
+                const center = box.getCenter(new THREE.Vector3());
+                lungModel.position.sub(center);
+                lungModel.position.y += 1;
+                scene.add(lungModel);
+                state.modelLoaded = true;
+                console.log("Model loaded successfully.");
+            }, undefined, (err) => {
+                showError("3D Model Error: Check models/lung.glb path.");
+                console.warn("Falling back to procedural geometry.");
+                createFallbackLung();
+            });
+        }
+
+        function createFallbackLung() {
+            const group = new THREE.Group();
+            const mat = new THREE.MeshPhongMaterial({ color: 0xcc6666, shininess: 30 });
+            const geom = new THREE.SphereGeometry(2.5, 32, 32);
+            geom.scale(0.7, 1.4, 0.5);
+            const left = new THREE.Mesh(geom, mat);
+            left.position.x = -1.8;
+            const right = new THREE.Mesh(geom, mat);
+            right.position.x = 1.8;
+            group.add(left, right);
+            lungModel = group;
+            scene.add(lungModel);
+            state.modelLoaded = true;
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            if (controls) controls.update();
+
+            if (state.isPlaying && !state.isModalOpen) {
+                try {
+                    // Rhythmic Breathing (Sine Wave)
+                    state.breathingTime += 0.025;
+                    if (lungModel) {
+                        const scale = 1 + Math.sin(state.breathingTime) * 0.05;
+                        lungModel.scale.set(scale, scale, scale);
+                        lungModel.rotation.y += 0.002;
+                    }
+                } catch (e) {
+                    // Silent catch to prevent loop crash if model is being swapped
+                }
+                
+                if (!state.manualMode) updateSync();
+            }
+
+            if (renderer && scene && camera) renderer.render(scene, camera);
+        }
+
+        function updateSync() {
+            state.currentTime = audio.currentTime;
+            state.duration = audio.duration || 0;
+            updateUI();
+
+            scriptMilestones.forEach((m, i) => {
+                if (state.currentTime >= m.time) {
+                    document.getElementById('script-text').innerText = m.text;
+                    if (m.question !== undefined && !state.questionsTriggered.has(m.question)) {
+                        triggerQuestion(m.question);
+                    }
+                }
+            });
+        }
+
+        function updateUI() {
+            const progress = (state.currentTime / state.duration) * 100 || 0;
+            document.getElementById('scrubber-progress').style.width = `${progress}%`;
+            const mins = Math.floor(state.currentTime / 60);
+            const secs = Math.floor(state.currentTime % 60);
+            document.getElementById('time-display').innerText = `${mins}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        function triggerQuestion(index) {
+            state.isModalOpen = true;
+            state.questionsTriggered.add(index);
+            audio.pause();
+
+            const q = questions[index];
+            document.getElementById('modal-question').innerText = q.text;
+            const container = document.getElementById('modal-options');
+            container.innerHTML = '';
+
+            q.options.forEach(opt => {
+                const btn = document.createElement('button');
+                btn.className = 'option-btn';
+                btn.innerText = `${opt.l}: ${opt.t}`;
+                btn.onclick = () => {
+                    if (opt.l === q.correct) {
+                        btn.classList.add('correct');
+                        setTimeout(closeModal, 1000);
+                    } else {
+                        btn.classList.add('incorrect');
+                        setTimeout(() => btn.classList.remove('incorrect'), 600);
+                    }
+                };
+                container.appendChild(btn);
+            });
+
+            document.getElementById('modal-overlay').style.display = 'flex';
+        }
+
+        function closeModal() {
+            document.getElementById('modal-overlay').style.display = 'none';
+            state.isModalOpen = false;
+            if (state.isPlaying && !state.manualMode) {
+                audio.play().catch(() => {});
+            }
+        }
+
+        function showError(msg) {
+            const el = document.getElementById('error-display');
+            el.innerText = msg;
+            el.style.display = 'block';
+        }
+
+        // --- Interaction ---
+        function startApp(manual = false) {
+            const intro = document.getElementById('intro-screen');
+            intro.style.opacity = '0';
+            setTimeout(() => intro.style.visibility = 'hidden', 800);
+
+            state.isPlaying = true;
+            state.manualMode = manual;
+
+            if (manual) {
+                document.getElementById('manual-trigger-btn').style.display = 'block';
+                document.getElementById('timeline-container').style.opacity = '0.3';
+                document.getElementById('timeline-container').style.pointerEvents = 'none';
+                document.getElementById('script-text').innerText = scriptMilestones[0].text;
+            } else {
+                audio.play().catch(err => {
+                    console.error("Audio Playback Failed:", err);
+                    showError("Audio blocked or missing. Switching to Manual Mode.");
+                    startApp(true);
+                });
+            }
+
+            initThree();
+        }
+
+        document.getElementById('start-btn').onclick = () => startApp(false);
+        document.getElementById('manual-mode-btn').onclick = () => startApp(true);
+
+        document.getElementById('manual-trigger-btn').onclick = () => {
+            state.currentMilestone++;
+            if (state.currentMilestone < scriptMilestones.length) {
+                const m = scriptMilestones[state.currentMilestone];
+                document.getElementById('script-text').innerText = m.text;
+                if (m.question !== undefined) triggerQuestion(m.question);
+            } else {
+                document.getElementById('script-text').innerText = "Lesson Complete.";
+                document.getElementById('manual-trigger-btn').style.display = 'none';
+            }
+        };
+
+        document.getElementById('play-btn').onclick = () => {
+            if (state.isModalOpen || state.manualMode) return;
+            state.isPlaying = !state.isPlaying;
+            if (state.isPlaying) audio.play(); else audio.pause();
+            document.getElementById('play-btn').innerText = state.isPlaying ? '⏸' : '▶';
+        };
+
+        // Simulate asset loading check
+        setTimeout(() => {
+            document.getElementById('intro-loader').style.display = 'none';
+            document.getElementById('loading-status').innerText = "Ready to Begin";
+            document.getElementById('start-btn').style.display = 'block';
+        }, 1500);
+
+        window.addEventListener('resize', () => {
+            if (camera && renderer) {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            }
+        });
+    </script>
+</body>
+</html>
